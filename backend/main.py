@@ -11,7 +11,7 @@ def conectar_mongodb():
     database = client.bar
     try:
         client.admin.command('ping')
-        print("Felicidades la conexion a sido exitosa")
+        print("Felicidades la conexion ha sido exitosa")
     except Exception as e:
         print(e)
 
@@ -19,7 +19,7 @@ def conectar_mongodb():
     mesas = database.mesas
     mesas.delete_many({})
     array_mesas = [
-        {"numero_mesa":1,"tipo": "mesa", "asientos":2, "estado":"ocupada"},
+        {"numero_mesa":1,"tipo": "mesa", "asientos":2, "estado":"libre"},
         {"numero_mesa":2,"tipo": "mesa", "asientos":3, "estado":"libre"},
         {"numero_mesa":3,"tipo": "mesa", "asientos":4, "estado":"libre"},
         {"numero_mesa":4,"tipo": "mesa", "asientos":5, "estado":"libre"},
@@ -72,16 +72,6 @@ def mostrar_mesas():
     for mesa in mesas_terraza:
         print(mesa)
 
-
-#Menu para gestionar el funcionamiento de la aplicacion de terminal
-def mostrar_menu():
-    print("-------Menu--------")
-    print("1. Ver Mesas")
-    print("2. Reservar mesas")
-    print("3. Gestionar pedidos")
-    print("4. Liberar mesas")
-    print("5. Ver factura")
-
 #Funcion que genera un QR para la mesas seleccionada
 def generar_qr(numero_mesa): 
         enlace_expo = f'exp://exp.host/projectbar/mesa/{numero_mesa}'
@@ -93,25 +83,71 @@ def generar_qr(numero_mesa):
 
 #Funcion que muestra el QR genrado con la funcion generar_qr si el numero de la mesa coincide y su estado es ocupada
 def ver_qr():
+       global database
+       mesas_tipos = [("mesas", database.mesas), ("barra", database.barra), ("terraza", database.terraza)]
+       numero_seleccionado = input("Introduce el número de la mesa de la que quieras el QR: ")
+       mesa_encontrada = False
+       for tipo, collection in mesas_tipos:
+        print(f"Mesas tipo {tipo}:")
+        for mesa in collection.find():
+            numero_mesa = mesa["numero_mesa"]
+            estado_mesa = mesa["estado"]
+            print(f"Número de mesa: {numero_mesa}, Estado: {estado_mesa}")
+
+            if numero_seleccionado == str(numero_mesa) and estado_mesa == "ocupada":
+                generar_qr(numero_seleccionado)
+                mesa_encontrada = True
+                break
+            
+        if not mesa_encontrada:
+            print("Revisa los datos: la mesa debe existir y estar ocupada.")
+
+#Funcion para reservar mesas, preguntara cuntos clientes vienen buscara una mesa con la misma cantidad de asientos y le cambiara a estado de ocupada
+def reservar_mesa():
     global database
-    mesas = database.mesas.find()
-    mesas_barra = database.barra.find()
-    mesas_terraza = database.terraza.find()
-    numero_mesas = [mesa["numero_mesa"] for mesa in mesas]
-    numero_mesas_barra = [mesa["numero_mesa"] for mesa in mesas_barra]
-    numero_mesas_terraza = [mesa["numero_mesa"] for mesa in mesas_terraza]
-    estado_mesas = [mesa["estado"] for mesa in mesas]
-    estado_mesas_barra = [mesa["estado"] for mesa in mesas_barra]
-    estado_mesas_terraza = [mesa["estado"] for mesa in mesas_terraza]
-    numero_mesa = int(input("Introduce el número de la mesa de la que quieras el QR: "))
-    if (numero_mesa in numero_mesas and estado_mesas[numero_mesas.index(numero_mesa)] == "ocupada") or \
-       (numero_mesa in numero_mesas_barra and estado_mesas_barra[numero_mesas_barra.index(numero_mesa)] == "ocupada") or \
-       (numero_mesa in numero_mesas_terraza and estado_mesas_terraza[numero_mesas_terraza.index(numero_mesa)] == "ocupada"):
-        generar_qr(numero_mesa)
-    else:
-        print("El número de mesa no coincide o el estado de la mesa no es ocupada. Por favor, revise los datos introducidos.")
+    mesas_restaurante = [("mesas", database.mesas), ("barra", database.barra), ("terraza", database.terraza)]
+    numero_clientes = input("Diganme cuantos vais a ser: ")
+    mesa_encontrada = False
+    for collection_nombre, collection in mesas_restaurante:
+        for mesa in collection.find():
+            asientos_mesa = mesa["asientos"]
+            estado_mesa = mesa["estado"]
+            if numero_clientes == str(asientos_mesa) and estado_mesa == "libre":
+                print("Te hemos encontrado una mesa. Gracias por llamar.")
+                collection.update_one({"_id": mesa["_id"]}, {"$set": {"estado": "ocupada"}})
+                mesa_encontrada = True
+                break
+        if mesa_encontrada:
+            break
+    if not mesa_encontrada:
+        print("Lo sentimos no nos quedan mesas libres.")        
+
+#Funcion para liberar una mesa es decir cambia el estado de la mesa seleccionada de ocupada a libre
+def liberar_mesa():
+    global database
+    mesas_restaurante = [("mesas", database.mesas), ("barra", database.barra), ("terraza", database.terraza)]
+    mesa_a_liberar = input("Oiches meu dime que mesa hay que liberar: ")
+    for collection_nombre, collection in mesas_restaurante:
+        for mesa in collection.find():
+            numero_mesa = mesa["numero_mesa"]
+            estado_mesa = mesa["estado"]
+            if mesa_a_liberar == str(numero_mesa) and estado_mesa == "ocupada":
+                print("Valee jefe ya la ví la libero ahora")
+                collection.update_one({"_id" : mesa["_id"]}, {"$set": {"estado":"libre"}})
+                print("Jefee la mesa ya esta liberada")
+                break
+            else:
+                print("Jefeee solo mentir he!! La mesa ya esta libre")    
 
 
+#Menu para gestionar el funcionamiento de la aplicacion de terminal
+def mostrar_menu():
+    print("-------Menu--------")
+    print("1. Ver Mesas")
+    print("2. Reservar mesas")
+    print("3. Gestionar pedidos")
+    print("4. Liberar mesas")
+    print("5. Ver factura")
 
 #Menu para gestionar las mesas 
 def menu_mesas():
@@ -140,13 +176,13 @@ def opcion1():
     gestion_mesas()
 
 def opcion2():
-    print("Hola mundo")
+    reservar_mesa()
 
 def opcion3():
     print("Hola mundo")
 
 def opcion4():
-    print("Hola mundo")
+    liberar_mesa()
 
 def opcion5():
     print("Hola mundo")
